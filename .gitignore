@@ -1,1 +1,15 @@
 .idea/
+misc/.ipynb_checkpoints/
+utils/__pycache__/
+data/__pycache__/
+model/__pycache__/
+model/utils/nms/__pycache__/
+model/utils/__pycache__/
+model/utils/nms/build/
+model/utils/nms/_nms_gpu_post.c
+model/utils/nms/_nms_gpu_post.cpython-36m-x86_64-linux-gnu.so
+*.pth
+.vscode/
+__pycache__/
+*.out
+.ipynb_checkpoints/

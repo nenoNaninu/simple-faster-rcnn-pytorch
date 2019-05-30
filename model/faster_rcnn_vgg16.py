@@ -1,4 +1,4 @@
-from __future__ import  absolute_import
+from __future__ import absolute_import
 import torch as t
 from torch import nn
 from torchvision.models import vgg16
@@ -54,12 +54,15 @@ class FasterRCNNVGG16(FasterRCNN):
 
     feat_stride = 16  # downsample 16x for output of conv5 in vgg16
 
+    # 入力が224x224だとconv5までで14x14になる。224/14 = 16。そういうこと。
+
     def __init__(self,
                  n_fg_class=20,
                  ratios=[0.5, 1, 2],
                  anchor_scales=[8, 16, 32]
                  ):
-                 
+        # エクストラクタ/RPN/headを別々に作って、親クラスのコンストラクタに流し込む。
+        # フォワードも親クラスで定義
         extractor, classifier = decom_vgg16()
 
         rpn = RegionProposalNetwork(
@@ -92,7 +95,7 @@ class VGG16RoIHead(nn.Module):
     Args:
         n_class (int): The number of classes possibly including the background.
         roi_size (int): Height and width of the feature maps after RoI-pooling.
-        spatial_scale (float): Scale of the roi is resized.
+        spatial_scale (float): Scale of the roi is resized. (VGG16ベースだと1/16が投げ込まれている。
         classifier (nn.Module): Two layer Linear ported from vgg16
 
     """
@@ -106,8 +109,8 @@ class VGG16RoIHead(nn.Module):
         self.cls_loc = nn.Linear(4096, n_class * 4)
         self.score = nn.Linear(4096, n_class)
 
-        normal_init(self.cls_loc, 0, 0.001)
-        normal_init(self.score, 0, 0.01)
+        normal_init(self.cls_loc, 0, 0.001)  # 初期化なのでスルー
+        normal_init(self.score, 0, 0.01)  # 初期化なのでスルー
 
         self.n_class = n_class
         self.roi_size = roi_size
@@ -132,18 +135,18 @@ class VGG16RoIHead(nn.Module):
 
         """
         # in case roi_indices is  ndarray
-        roi_indices = at.totensor(roi_indices).float()
-        rois = at.totensor(rois).float()
-        indices_and_rois = t.cat([roi_indices[:, None], rois], dim=1)
+        roi_indices = at.totensor(roi_indices).float() # roi_indicesのshapeは(300,)
+        rois = at.totensor(rois).float() # roisのshapeは(300,4)
+        indices_and_rois = t.cat([roi_indices[:, None], rois], dim=1) # indices_and_roisのshapeは(300, 5)
         # NOTE: important: yx->xy
         xy_indices_and_rois = indices_and_rois[:, [0, 2, 1, 4, 3]]
-        indices_and_rois =  xy_indices_and_rois.contiguous()
-
-        pool = self.roi(x, indices_and_rois)
-        pool = pool.view(pool.size(0), -1)
-        fc7 = self.classifier(pool)
-        roi_cls_locs = self.cls_loc(fc7)
-        roi_scores = self.score(fc7)
+        indices_and_rois = xy_indices_and_rois.contiguous() # indices_and_rois(300, 5)
+        # xのshape, (1, 512, 37, 50)
+        pool = self.roi(x, indices_and_rois) #ここでロイプーリング。(300, 512, 7, 7)
+        pool = pool.view(pool.size(0), -1) # poolは (300, 25088)にshape
+        fc7 = self.classifier(pool) # fc7のshapeは(300, 4096)
+        roi_cls_locs = self.cls_loc(fc7) # roi_cls_locsのshapeは(300, 84)
+        roi_scores = self.score(fc7) # roi_scoresのshapeは(300, 21)
         return roi_cls_locs, roi_scores
 
 

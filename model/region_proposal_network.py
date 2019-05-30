@@ -47,6 +47,7 @@ class RegionProposalNetwork(nn.Module):
             proposal_creator_params=dict(),
     ):
         super(RegionProposalNetwork, self).__init__()
+        # anchor_baseは(9,4)のndarray。 anchor_scales * rations = 3 * 3なので9。x,y,w,hで4
         self.anchor_base = generate_anchor_base(
             anchor_scales=anchor_scales, ratios=ratios)
         self.feat_stride = feat_stride
@@ -54,10 +55,10 @@ class RegionProposalNetwork(nn.Module):
         n_anchor = self.anchor_base.shape[0]
         self.conv1 = nn.Conv2d(in_channels, mid_channels, 3, 1, 1)
         self.score = nn.Conv2d(mid_channels, n_anchor * 2, 1, 1, 0)
-        self.loc = nn.Conv2d(mid_channels, n_anchor * 4, 1, 1, 0)
+        self.loc   = nn.Conv2d(mid_channels, n_anchor * 4, 1, 1, 0)
         normal_init(self.conv1, 0, 0.01)
         normal_init(self.score, 0, 0.01)
-        normal_init(self.loc, 0, 0.01)
+        normal_init(self.loc  , 0, 0.01)
 
     def forward(self, x, img_size, scale=1.):
         """Forward Region Proposal Network.
@@ -98,7 +99,9 @@ class RegionProposalNetwork(nn.Module):
                 Its shape is :math:`(H W A, 4)`.
 
         """
+        # xはextractorが抽出したもの。
         n, _, hh, ww = x.shape
+        # anchorはshape=(16650,4)で返ってくる。
         anchor = _enumerate_shifted_anchor(
             np.array(self.anchor_base),
             self.feat_stride, hh, ww)
@@ -106,16 +109,19 @@ class RegionProposalNetwork(nn.Module):
         n_anchor = anchor.shape[0] // (hh * ww)
         h = F.relu(self.conv1(x))
 
+        # locは吐き出すConv
+        # 512 ->n_anchor * 4(ここでは9アンカー*4なので36チャンネルが吐き出される。
         rpn_locs = self.loc(h)
         # UNNOTE: check whether need contiguous
         # A: Yes
-        rpn_locs = rpn_locs.permute(0, 2, 3, 1).contiguous().view(n, -1, 4)
-        rpn_scores = self.score(h)
+        rpn_locs = rpn_locs.permute(0, 2, 3, 1).contiguous().view(n, -1, 4) # (1,16650,4)
+        rpn_scores = self.score(h) # (1,37,50,18)
         rpn_scores = rpn_scores.permute(0, 2, 3, 1).contiguous()
+        # rpn_softmax_scoresは(1,37,50,9,2)
         rpn_softmax_scores = F.softmax(rpn_scores.view(n, hh, ww, n_anchor, 2), dim=4)
         rpn_fg_scores = rpn_softmax_scores[:, :, :, :, 1].contiguous()
         rpn_fg_scores = rpn_fg_scores.view(n, -1)
-        rpn_scores = rpn_scores.view(n, -1, 2)
+        rpn_scores = rpn_scores.view(n, -1, 2) # (1,16650,2)
 
         rois = list()
         roi_indices = list()
@@ -150,11 +156,13 @@ def _enumerate_shifted_anchor(anchor_base, feat_stride, height, width):
     shift_y = xp.arange(0, height * feat_stride, feat_stride)
     shift_x = xp.arange(0, width * feat_stride, feat_stride)
     shift_x, shift_y = xp.meshgrid(shift_x, shift_y)
+    # shiftはサンプルの場合、(1850,4)のテンソルになって出てくる。
     shift = xp.stack((shift_y.ravel(), shift_x.ravel(),
                       shift_y.ravel(), shift_x.ravel()), axis=1)
 
     A = anchor_base.shape[0]
     K = shift.shape[0]
+    # 下で(16650,4)のanchorが出来上がる
     anchor = anchor_base.reshape((1, A, 4)) + \
              shift.reshape((1, K, 4)).transpose((1, 0, 2))
     anchor = anchor.reshape((K * A, 4)).astype(np.float32)

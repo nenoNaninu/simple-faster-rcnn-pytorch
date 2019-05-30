@@ -1,4 +1,4 @@
-from __future__ import  absolute_import
+from __future__ import absolute_import
 # though cupy is not used but without this line, it raise errors...
 import cupy as cp
 import os
@@ -48,6 +48,11 @@ def eval(dataloader, faster_rcnn, test_num=10000):
 
 
 def train(**kwargs):
+
+    faster_rcnn = FasterRCNNVGG16()
+    print('model construct completed')
+    trainer = FasterRCNNTrainer(faster_rcnn).cuda()
+
     opt._parse(kwargs)
 
     dataset = Dataset(opt)
@@ -64,9 +69,7 @@ def train(**kwargs):
                                        shuffle=False, \
                                        pin_memory=True
                                        )
-    faster_rcnn = FasterRCNNVGG16()
-    print('model construct completed')
-    trainer = FasterRCNNTrainer(faster_rcnn).cuda()
+
     if opt.load_path:
         trainer.load(opt.load_path)
         print('load pretrained model from %s' % opt.load_path)
@@ -122,7 +125,7 @@ def train(**kwargs):
             trainer.faster_rcnn.scale_lr(opt.lr_decay)
             lr_ = lr_ * opt.lr_decay
 
-        if epoch == 13: 
+        if epoch == 13:
             break
 
 
