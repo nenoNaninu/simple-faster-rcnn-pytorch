@@ -169,8 +169,11 @@ class FasterRCNN(nn.Module):
         score = list()
         # skip cls_id = 0 because it is the background class
         for l in range(1, self.n_class):
+            # reshapeで(300, 21, 4)になる。
+            # raw_cls_bboxは(300, 21 * 4)
             cls_bbox_l = raw_cls_bbox.reshape((-1, self.n_class, 4))[:, l, :]
-            prob_l = raw_prob[:, l]
+
+            prob_l = raw_prob[:, l]  # raw_probのshapeは(300, 21), prob_lは(300,) 21クラス分のそれぞれに300個ある。
             mask = prob_l > self.score_thresh
             cls_bbox_l = cls_bbox_l[mask]
             prob_l = prob_l[mask]
@@ -236,20 +239,20 @@ class FasterRCNN(nn.Module):
             scale = img.shape[3] / size[1]  # 変形後/変形前。何倍されたか。サンプルの場合は1.6倍される。
             roi_cls_loc, roi_scores, rois, _ = self(img, scale=scale)  # 実質forward呼んでるに等しい。
             # We are assuming that batch size is 1.
-            roi_score = roi_scores.data # roi_scoreのshape, (300, 21)
-            roi_cls_loc = roi_cls_loc.data # roi_cls_locのshape, (300, 84)
-            roi = at.totensor(rois) / scale
+            roi_score = roi_scores.data  # roi_scoreのshape, (300, 21)
+            roi_cls_loc = roi_cls_loc.data  # roi_cls_locのshape, (300, 84)
+            roi = at.totensor(rois) / scale  # roiのshape, (300, 4)
 
             # Convert predictions to bounding boxes in image coordinates.
             # Bounding boxes are scaled to the scale of the input images.
             mean = t.Tensor(self.loc_normalize_mean).cuda(). \
-                repeat(self.n_class)[None]
+                repeat(self.n_class)[None]  # meanのshapeは([1,84])
             std = t.Tensor(self.loc_normalize_std).cuda(). \
-                repeat(self.n_class)[None]
+                repeat(self.n_class)[None]  # stdのshapeは([1,84])
 
-            roi_cls_loc = (roi_cls_loc * std + mean)
-            roi_cls_loc = roi_cls_loc.view(-1, self.n_class, 4)
-            roi = roi.view(-1, 1, 4).expand_as(roi_cls_loc)
+            roi_cls_loc = (roi_cls_loc * std + mean)  # roi_cls_locのshapeは([300, 84])
+            roi_cls_loc = roi_cls_loc.view(-1, self.n_class, 4)  # roi_cls_loc([300, 21, 4])
+            roi = roi.view(-1, 1, 4).expand_as(roi_cls_loc)  # roiのshapeは([300, 21, 4])
             cls_bbox = loc2bbox(at.tonumpy(roi).reshape((-1, 4)),
                                 at.tonumpy(roi_cls_loc).reshape((-1, 4)))
             cls_bbox = at.totensor(cls_bbox)
@@ -260,8 +263,8 @@ class FasterRCNN(nn.Module):
 
             prob = at.tonumpy(F.softmax(at.totensor(roi_score), dim=1))
 
-            raw_cls_bbox = at.tonumpy(cls_bbox)
-            raw_prob = at.tonumpy(prob)
+            raw_cls_bbox = at.tonumpy(cls_bbox)  # cls_bboxのshapeは(300,84)
+            raw_prob = at.tonumpy(prob)  # probのshapeは(300, 21)
 
             bbox, label, score = self._suppress(raw_cls_bbox, raw_prob)
             bboxes.append(bbox)
