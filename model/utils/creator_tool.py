@@ -367,9 +367,9 @@ class ProposalCreator:
             anchor (array): Coordinates of anchors. Its shape is
                 :math:`(R, 4)`.
             img_size (tuple of ints): A tuple :obj:`height, width`,
-                which contains image size after scaling.
+                which contains image size after scaling.ようするに(600,800)
             scale (float): The scaling factor used to scale an image after
-                reading it from a file.
+                reading it from a file. (1.6)
 
         Returns:
             array:
@@ -405,8 +405,10 @@ class ProposalCreator:
         min_size = self.min_size * scale
         hs = roi[:, 2] - roi[:, 0]
         ws = roi[:, 3] - roi[:, 1]
+        tmp = np.where((hs >= min_size) & (ws >= min_size))
+        # np.where((hs >= min_size) & (ws >= min_size)) は (16590,)
         keep = np.where((hs >= min_size) & (ws >= min_size))[0]
-        roi = roi[keep, :]
+        roi = roi[keep, :]  # roiは(16590,4)
         score = score[keep]
 
         # Sort all (proposal, score) pairs by score from highest to lowest.

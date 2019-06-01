@@ -51,14 +51,14 @@ class RegionProposalNetwork(nn.Module):
         self.anchor_base = generate_anchor_base(
             anchor_scales=anchor_scales, ratios=ratios)
         self.feat_stride = feat_stride
-        self.proposal_layer = ProposalCreator(self, **proposal_creator_params)
+        self.proposal_layer = ProposalCreator(self, **proposal_creator_params)  # これはなんだろうなぁ。
         n_anchor = self.anchor_base.shape[0]
         self.conv1 = nn.Conv2d(in_channels, mid_channels, 3, 1, 1)
-        self.score = nn.Conv2d(mid_channels, n_anchor * 2, 1, 1, 0)
-        self.loc   = nn.Conv2d(mid_channels, n_anchor * 4, 1, 1, 0)
-        normal_init(self.conv1, 0, 0.01)
-        normal_init(self.score, 0, 0.01)
-        normal_init(self.loc  , 0, 0.01)
+        self.score = nn.Conv2d(mid_channels, n_anchor * 2, 1, 1, 0)  # 2k 論文でいうところのcls_layer
+        self.loc = nn.Conv2d(mid_channels, n_anchor * 4, 1, 1, 0)  # 4k 論文でいうところのreg_layer
+        normal_init(self.conv1, 0, 0.01)  # 初期化
+        normal_init(self.score, 0, 0.01)  # 初期化
+        normal_init(self.loc, 0, 0.01)  # 初期化
 
     def forward(self, x, img_size, scale=1.):
         """Forward Region Proposal Network.
@@ -101,7 +101,7 @@ class RegionProposalNetwork(nn.Module):
         """
         # xはextractorが抽出したもの。
         n, _, hh, ww = x.shape
-        # anchorはshape=(16650,4)で返ってくる。
+        # anchorはshape=(16650,4)で返ってくる。 shapeの(1850, 9, 4)
         anchor = _enumerate_shifted_anchor(
             np.array(self.anchor_base),
             self.feat_stride, hh, ww)
@@ -109,23 +109,25 @@ class RegionProposalNetwork(nn.Module):
         n_anchor = anchor.shape[0] // (hh * ww)
         h = F.relu(self.conv1(x))
 
-        # locは吐き出すConv
+        # locはConv
         # 512 ->n_anchor * 4(ここでは9アンカー*4なので36チャンネルが吐き出される。
+        # rpn_locs のshapeは(1, 36, 37, 50)
         rpn_locs = self.loc(h)
         # UNNOTE: check whether need contiguous
         # A: Yes
-        rpn_locs = rpn_locs.permute(0, 2, 3, 1).contiguous().view(n, -1, 4) # (1,16650,4)
-        rpn_scores = self.score(h) # (1,37,50,18)
-        rpn_scores = rpn_scores.permute(0, 2, 3, 1).contiguous()
+        rpn_locs = rpn_locs.permute(0, 2, 3, 1).contiguous().view(n, -1, 4)  # (1,16650,4) 16650 = 37 * 50 * 9
+        rpn_scores = self.score(h)  # (1,18,37,50)
+        rpn_scores = rpn_scores.permute(0, 2, 3, 1).contiguous()  # (1,37,50,18)
         # rpn_softmax_scoresは(1,37,50,9,2)
         rpn_softmax_scores = F.softmax(rpn_scores.view(n, hh, ww, n_anchor, 2), dim=4)
-        rpn_fg_scores = rpn_softmax_scores[:, :, :, :, 1].contiguous()
-        rpn_fg_scores = rpn_fg_scores.view(n, -1)
-        rpn_scores = rpn_scores.view(n, -1, 2) # (1,16650,2)
+        rpn_fg_scores = rpn_softmax_scores[:, :, :, :, 1].contiguous()  # 0が背景、1が前景。
+        rpn_fg_scores = rpn_fg_scores.view(n, -1)  # (1, 16650)
+        rpn_scores = rpn_scores.view(n, -1, 2)  # (1,16650,2)
 
         rois = list()
         roi_indices = list()
-        for i in range(n):
+        for i in range(n):  # 画像が1枚ならn = 1
+            # roiはshape(300, 4)
             roi = self.proposal_layer(
                 rpn_locs[i].cpu().data.numpy(),
                 rpn_fg_scores[i].cpu().data.numpy(),
@@ -135,8 +137,10 @@ class RegionProposalNetwork(nn.Module):
             rois.append(roi)
             roi_indices.append(batch_index)
 
+        # roisは(300, 4)
         rois = np.concatenate(rois, axis=0)
         roi_indices = np.concatenate(roi_indices, axis=0)
+
         return rpn_locs, rpn_scores, rois, roi_indices, anchor
 
 
@@ -163,9 +167,11 @@ def _enumerate_shifted_anchor(anchor_base, feat_stride, height, width):
     A = anchor_base.shape[0]
     K = shift.shape[0]
     # 下で(16650,4)のanchorが出来上がる
+    # anchor_base.reshape((1, A, 4))                # shape(1   , 9, 4)
+    # shift.reshape((1, K, 4)).transpose((1, 0, 2)) # shape(1850, 1, 4)
     anchor = anchor_base.reshape((1, A, 4)) + \
-             shift.reshape((1, K, 4)).transpose((1, 0, 2))
-    anchor = anchor.reshape((K * A, 4)).astype(np.float32)
+             shift.reshape((1, K, 4)).transpose((1, 0, 2))  # shape (1850, 9, 4)
+    anchor = anchor.reshape((K * A, 4)).astype(np.float32)  # shape (16650,4)
     return anchor
 
 

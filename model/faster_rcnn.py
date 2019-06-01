@@ -129,9 +129,9 @@ class FasterRCNN(nn.Module):
         img_size = x.shape[2:]
 
         h = self.extractor(x)  # サンプルでは(1,512,37,50)のテンソル
-
+        # rpn_locs(1,16650,4) rpn_scores(1,16650,2) roi(300, 4), roi_indices(300) anchor(16650, 4)
         rpn_locs, rpn_scores, rois, roi_indices, anchor = self.rpn(h, img_size, scale)
-
+        # roi_cls_locs(300,84) roi_scores(300,21)
         roi_cls_locs, roi_scores = self.head(h, rois, roi_indices)
 
         return roi_cls_locs, roi_scores, rois, roi_indices

@@ -50,15 +50,15 @@ def loc2bbox(src_bbox, loc):
 
     if src_bbox.shape[0] == 0:
         return xp.zeros((0, 4), dtype=loc.dtype)
-
+    # (16650,4)
     src_bbox = src_bbox.astype(src_bbox.dtype, copy=False)
 
     src_height = src_bbox[:, 2] - src_bbox[:, 0]
     src_width = src_bbox[:, 3] - src_bbox[:, 1]
-    src_ctr_y = src_bbox[:, 0] + 0.5 * src_height
+    src_ctr_y = src_bbox[:, 0] + 0.5 * src_height  # ctr = center
     src_ctr_x = src_bbox[:, 1] + 0.5 * src_width
-
-    dy = loc[:, 0::4]
+    # locのshapeは(16650,4)
+    dy = loc[:, 0::4]  # loc[:, 0::4]だと(16650,1)になるが、loc[:,0]だと(16650,)になってしまう。、
     dx = loc[:, 1::4]
     dh = loc[:, 2::4]
     dw = loc[:, 3::4]
