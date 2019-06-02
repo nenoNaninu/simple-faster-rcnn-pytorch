@@ -58,7 +58,7 @@ def loc2bbox(src_bbox, loc):
     src_ctr_y = src_bbox[:, 0] + 0.5 * src_height  # ctr = center
     src_ctr_x = src_bbox[:, 1] + 0.5 * src_width
     # locのshapeは(16650,4)
-    dy = loc[:, 0::4]  # loc[:, 0::4]だと(16650,1)になるが、loc[:,0]だと(16650,)になってしまう。、
+    dy = loc[:, 0::4]  # loc[:, 0::4]だと(16650,1)になるが、loc[:,0]だと(16650,)になってしまう。
     dx = loc[:, 1::4]
     dh = loc[:, 2::4]
     dw = loc[:, 3::4]

@@ -393,7 +393,7 @@ class ProposalCreator:
 
         # Convert anchors into proposal via bbox transformations.
         # roi = loc2bbox(anchor, loc)
-        roi = loc2bbox(anchor, loc)
+        roi = loc2bbox(anchor, loc)  # roiは(16650,4)
 
         # Clip predicted boxes to image.
         roi[:, slice(0, 4, 2)] = np.clip(
@@ -402,10 +402,11 @@ class ProposalCreator:
             roi[:, slice(1, 4, 2)], 0, img_size[1])
 
         # Remove predicted boxes with either height or width < threshold.
+        # 16 * 1.6
         min_size = self.min_size * scale
-        hs = roi[:, 2] - roi[:, 0]
+        hs = roi[:, 2] - roi[:, 0]  # hsのshapeは(16650,)
         ws = roi[:, 3] - roi[:, 1]
-        tmp = np.where((hs >= min_size) & (ws >= min_size))
+        # tmp = np.where((hs >= min_size) & (ws >= min_size))
         # np.where((hs >= min_size) & (ws >= min_size)) は (16590,)
         keep = np.where((hs >= min_size) & (ws >= min_size))[0]
         roi = roi[keep, :]  # roiは(16590,4)
@@ -429,4 +430,4 @@ class ProposalCreator:
         if n_post_nms > 0:
             keep = keep[:n_post_nms]
         roi = roi[keep]
-        return roi
+        return roi  # ここで(300,4)になってる。

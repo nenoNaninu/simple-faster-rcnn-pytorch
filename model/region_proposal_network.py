@@ -84,20 +84,26 @@ class RegionProposalNetwork(nn.Module):
             This is a tuple of five following values.
 
             * **rpn_locs**: Predicted bounding box offsets and scales for \
-                anchors. Its shape is :math:`(N, H W A, 4)`.
+                anchors. Its shape is :math:`(N, H W A, 4)`.\
+                バウンディングボックスのオフセット
             * **rpn_scores**:  Predicted foreground scores for \
-                anchors. Its shape is :math:`(N, H W A, 2)`.
+                anchors. Its shape is :math:`(N, H W A, 2)`.\
+                前景背景のスコア
             * **rois**: A bounding box array containing coordinates of \
                 proposal boxes.  This is a concatenation of bounding box \
                 arrays from multiple images in the batch. \
                 Its shape is :math:`(R', 4)`. Given :math:`R_i` predicted \
                 bounding boxes from the :math:`i` th image, \
-                :math:`R' = \\sum _{i=1} ^ N R_i`.
+                :math:`R' = \\sum _{i=1} ^ N R_i`.\
+                proposal_layerで計算されたroiを返す。
             * **roi_indices**: An array containing indices of images to \
-                which RoIs correspond to. Its shape is :math:`(R',)`.
+                which RoIs correspond to. Its shape is :math:`(R',)`.\
+                画像一枚だと0000...000で300個。
+
+
             * **anchor**: Coordinates of enumerated shifted anchors. \
                 Its shape is :math:`(H W A, 4)`.
-
+                _enumerate_shifted_anchorで返ってきた
         """
         # xはextractorが抽出したもの。
         n, _, hh, ww = x.shape
@@ -109,7 +115,7 @@ class RegionProposalNetwork(nn.Module):
         n_anchor = anchor.shape[0] // (hh * ww)
         h = F.relu(self.conv1(x))
 
-        # locはConv
+        # locはConv(locationかなぁ。
         # 512 ->n_anchor * 4(ここでは9アンカー*4なので36チャンネルが吐き出される。
         # rpn_locs のshapeは(1, 36, 37, 50)
         rpn_locs = self.loc(h)
